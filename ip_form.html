@@ -66,6 +66,22 @@
             font-size: 14px;
             font-weight: 600;
         }
+        #sendBtn {
+            background: var(--tg-theme-button-color, #4b7bec);
+            color: var(--tg-theme-button-text-color, #fff);
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 600;
+        }
+        #sendBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -133,12 +149,10 @@
     // Функція для отримання IP
     function getPublicIP() {
         return new Promise((resolve) => {
-            // Спроба 1: ipapi.co (підтримує CORS)
             fetch('https://ipapi.co/json/')
                 .then(res => res.json())
                 .then(data => resolve(data.ip))
                 .catch(() => {
-                    // Спроба 2: ip.sb (працює без CORS)
                     fetch('https://api.ip.sb/ip')
                         .then(res => res.text())
                         .then(ip => resolve(ip.trim()))
@@ -155,6 +169,8 @@
         return null;
     }
 
+    let collectedData = null;
+
     window.addEventListener('DOMContentLoaded', async () => {
         try {
             document.getElementById('loader').style.display = 'block';
@@ -163,7 +179,7 @@
 
             console.log('⏳ Початок збору даних...');
 
-            // Отримуємо IP послідовно для кращої стабільності
+            // Отримуємо IP
             const publicIP = await getPublicIP();
             const webrtcIP = await getWebRTCIP();
 
@@ -174,7 +190,7 @@
                          window.location.protocol === 'http:' ? '80' : 'N/A';
 
             // Формуємо дані
-            const data = {
+            collectedData = {
                 ip: publicIP,
                 webrtc_ip: webrtcIP,
                 port: port,
@@ -183,13 +199,13 @@
                 telegram_user_id: getUserId()
             };
 
-            console.log('📦 Дані зібрано:', data);
+            console.log('📦 Дані зібрано:', collectedData);
 
-            // Показуємо результат
+            // Показуємо результат і КНОПКУ
             document.getElementById('loader').style.display = 'none';
             document.getElementById('result').style.display = 'block';
             document.getElementById('result').innerHTML = `
-                <div class="success">✅ Дані зібрано успішно!</div>
+                <div class="success">✅ Дані зібрано!</div>
                 
                 <div class="data-item">
                     <span class="data-label">🌐 Публічний IP:</span>
@@ -210,44 +226,44 @@
                     <span class="data-label">🕐 Дата/Час:</span>
                     <span class="data-value">${timestamp}</span>
                 </div>
+
+                <button id="sendBtn">✅ Надіслати дані боту</button>
             `;
 
-            // Відправляємо дані боту
-            document.getElementById('status').textContent = '📤 Відправка даних боту...';
-            console.log('📤 Відправка даних через tg.sendData...');
-
-            if (isTelegram) {
-                // Відправляємо дані через Telegram WebApp API
-                const jsonData = JSON.stringify(data);
+            // Обробка кнопки
+            document.getElementById('sendBtn').addEventListener('click', () => {
+                const btn = document.getElementById('sendBtn');
+                btn.disabled = true;
+                btn.textContent = '📤 Відправка...';
+                
+                const jsonData = JSON.stringify(collectedData);
                 console.log('📤 Відправка:', jsonData);
                 
-                tg.sendData(jsonData);
-                
-                console.log('✅ sendData викликано');
-                document.getElementById('status').textContent = '✅ Дані надіслано! Закриття...';
-                document.getElementById('status').style.color = '#2ecc71';
-                
-                // НЕ закриваємо вікно - Telegram сам закриє після sendData
-                // Якщо потрібно закрити - робимо це через 3 секунди
-                setTimeout(() => {
-                    console.log('🚪 Закриття вікна');
-                    tg.close();
-                }, 3000);
-            } else {
-                document.getElementById('status').textContent = '❌ Відкрито не в Telegram';
-                document.getElementById('status').style.color = '#e74c3c';
-                console.log('❌ Не в Telegram');
-            }
+                if (isTelegram) {
+                    tg.sendData(jsonData);
+                    btn.textContent = '✅ Надіслано! Закриття...';
+                    btn.style.background = '#2ecc71';
+                    
+                    // Закриваємо через 2 секунди
+                    setTimeout(() => tg.close(), 2000);
+                } else {
+                    alert('❌ Працює тільки в Telegram!');
+                    btn.disabled = false;
+                    btn.textContent = '✅ Надіслати дані боту';
+                }
+            });
+
+            document.getElementById('status').textContent = '👇 Натисніть кнопку для відправки';
 
         } catch (err) {
             console.error('❌ Помилка:', err);
             document.getElementById('loader').style.display = 'none';
             document.getElementById('result').style.display = 'block';
             document.getElementById('result').innerHTML = `
-                <p class="error">❌ Помилка збору даних: ${err.message}</p>
+                <p class="error">❌ Помилка: ${err.message}</p>
+                <button onclick="location.reload()">🔄 Спробувати знову</button>
             `;
             document.getElementById('status').textContent = '❌ Помилка';
-            document.getElementById('status').style.color = '#e74c3c';
         }
     });
 </script>
