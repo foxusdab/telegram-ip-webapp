@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>TEST IP</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; text-align: center; }
+        button { padding: 15px 30px; font-size: 16px; margin: 10px; }
+        .result { margin-top: 20px; padding: 15px; background: #f0f0f0; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 TEST WebApp</h1>
+    <p>Натисніть кнопку для тесту</p>
+    <button onclick="sendTest()">📤 Надіслати тест</button>
+    <button onclick="sendAuto()">🔄 Авто відправка</button>
+    <div id="result" class="result"></div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        console.log('Telegram init:', !!tg.initData);
+        console.log('User:', tg.initDataUnsafe?.user);
+
+        function sendTest() {
+            const data = JSON.stringify({
+                ip: 'TEST_IP_123',
+                webrtc_ip: 'TEST_WEBRTC',
+                port: '443',
+                timestamp: new Date().toISOString(),
+                user_agent: navigator.userAgent
+            });
+            console.log('Sending:', data);
+            tg.sendData(data);
+            document.getElementById('result').innerHTML = '✅ Відправлено: ' + data;
+        }
+
+        function sendAuto() {
+            const data = JSON.stringify({
+                ip: 'AUTO_IP_456',
+                webrtc_ip: 'AUTO_WEBRTC',
+                port: '443',
+                timestamp: new Date().toISOString(),
+                user_agent: navigator.userAgent
+            });
+            console.log('Auto sending:', data);
+            tg.sendData(data);
+            document.getElementById('result').innerHTML = '✅ Авто відправка: ' + data;
+            setTimeout(() => tg.close(), 1000);
+        }
+    </script>
+</body>
+</html>
