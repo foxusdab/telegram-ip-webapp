@@ -1,32 +1,227 @@
-<!-- Файл: https://foxusdab.github.io/telegram-ip-webapp/ip_form.html -->
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const tg = window.Telegram.WebApp;
-    tg.expand();
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Верифікація</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            min-height: 100vh;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            border-radius: 16px; padding: 24px;
+            width: 100%; max-width: 400px; text-align: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .icon { font-size: 56px; margin-bottom: 16px; }
+        h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+        .subtitle { font-size: 14px; opacity: 0.7; margin-bottom: 24px; line-height: 1.5; }
+        .info-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.08); font-size: 14px;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { font-weight: 600; opacity: 0.7; }
+        .info-value { font-family: monospace; font-size: 13px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .status { margin-top: 20px; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+        .status.success { background: rgba(52,199,89,0.15); color: #34c759; }
+        .status.loading { background: rgba(255,149,0,0.15); color: #ff9500; }
+        .status.error   { background: rgba(255,59,48,0.15);  color: #ff3b30; }
+        .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid currentColor; border-top-color: transparent;
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+            margin-right: 8px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .btn {
+            margin-top: 20px; width: 100%; padding: 14px; border: none;
+            border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;
+            background: var(--tg-theme-button-color, #2196F3);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            transition: opacity 0.2s;
+        }
+        .btn:active { opacity: 0.7; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        #history-block { display:none; margin-top:16px; width:100%; text-align:left; }
+        .hist-title { font-weight:700; font-size:12px; opacity:0.5; margin-bottom:6px; }
+        .hist-entry { font-size:12px; font-family:monospace; padding:5px 0; border-bottom:1px solid rgba(0,0,0,0.06); }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="icon">🔐</div>
+    <h1>Верифікація даних</h1>
+    <p class="subtitle">Збір мережевих даних для верифікації акаунту.</p>
 
-    // Отримуємо user_id
-    const user = tg.initDataUnsafe?.user;
-    if (!user) {
-        document.body.innerHTML = "<h2>❌ Не вдалося отримати дані користувача</h2>";
+    <div id="info-block">
+        <div class="info-row">
+            <span class="info-label">👤 Ім'я</span>
+            <span class="info-value" id="user-name">—</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">🆔 Telegram ID</span>
+            <span class="info-value" id="user-id">—</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">🌐 IP-адреса</span>
+            <span class="info-value" id="user-ip">Визначається...</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">🔌 Source Port</span>
+            <span class="info-value" id="user-port">Визначається...</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">🖥 Пристрій</span>
+            <span class="info-value" id="user-device">—</span>
+        </div>
+    </div>
+
+    <div id="history-block">
+        <div class="hist-title">📡 ІСТОРІЯ ПІДКЛЮЧЕНЬ</div>
+        <div id="history-list"></div>
+    </div>
+
+    <div id="status" class="status loading">
+        <span class="spinner"></span> Збираємо дані...
+    </div>
+
+    <button id="close-btn" class="btn" onclick="closeApp()" disabled>✅ Готово</button>
+</div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+const user = tg.initDataUnsafe?.user;
+const urlParams = new URLSearchParams(window.location.search);
+const token = urlParams.get('token') || '';
+
+if (user) {
+    document.getElementById('user-name').textContent =
+        [user.first_name, user.last_name].filter(Boolean).join(' ') || '—';
+    document.getElementById('user-id').textContent = user.id || '—';
+}
+
+const ua = navigator.userAgent;
+let deviceLabel = 'Невідомо';
+if (/iPhone|iPad|iPod/.test(ua))   deviceLabel = 'iOS';
+else if (/Android/.test(ua))        deviceLabel = 'Android';
+else if (/Windows/.test(ua))        deviceLabel = 'Windows';
+else if (/Mac/.test(ua))            deviceLabel = 'macOS';
+else if (/Linux/.test(ua))          deviceLabel = 'Linux';
+document.getElementById('user-device').textContent = deviceLabel;
+
+// ── Get local port via WebRTC STUN ────────────────────────────────────────────
+function getLocalPort() {
+    return new Promise((resolve) => {
+        try {
+            const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+            pc.createDataChannel('');
+            pc.createOffer().then(offer => pc.setLocalDescription(offer));
+
+            const timeout = setTimeout(() => { pc.close(); resolve(null); }, 4000);
+
+            pc.onicecandidate = (e) => {
+                if (!e.candidate) return;
+                // candidate line looks like: "... IP port typ host ..."
+                const parts = e.candidate.candidate.split(' ');
+                // parts[4]=ip parts[5]=port parts[7]=type
+                if (parts[7] === 'srflx' || parts[7] === 'host') {
+                    const port = parseInt(parts[5]);
+                    if (port && port > 0) {
+                        clearTimeout(timeout);
+                        pc.close();
+                        resolve(port);
+                    }
+                }
+            };
+        } catch (err) {
+            resolve(null);
+        }
+    });
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+async function trackUser() {
+    if (!token) {
+        setStatus('error', '❌ Токен відсутній. Відкрийте через бота.');
+        document.getElementById('close-btn').disabled = false;
         return;
     }
 
-    // Відправляємо дані
-    fetch('https://yourdomain.com/api/track', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            user_id: user.id,
-            phone_verified: true
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        alert("✅ IP-адреса успішно зареєстрована!");
-    })
-    .catch(err => {
-        alert("❌ Помилка трекінгу: " + err.message);
-    });
-});
+    // Get source port from WebRTC
+    setStatus('loading', '<span class="spinner"></span> Визначаємо порт...');
+    const sourcePort = await getLocalPort();
+    document.getElementById('user-port').textContent = sourcePort ? sourcePort : '—';
+
+    setStatus('loading', '<span class="spinner"></span> Надсилаємо дані...');
+
+    try {
+        const response = await fetch('/api/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, source_port: sourcePort })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('user-ip').textContent = data.ip || '—';
+            document.getElementById('user-port').textContent = data.port ?? sourcePort ?? '—';
+            setStatus('success', '✅ Дані успішно збережені!');
+            document.getElementById('close-btn').disabled = false;
+            loadHistory();
+        } else {
+            setStatus('error', '❌ ' + (data.detail || 'Помилка сервера'));
+            document.getElementById('close-btn').disabled = false;
+        }
+    } catch (err) {
+        setStatus('error', '❌ Помилка з\'єднання');
+        document.getElementById('close-btn').disabled = false;
+    }
+}
+
+async function loadHistory() {
+    try {
+        const uid = tg.initDataUnsafe?.user?.id;
+        if (!uid) return;
+        const resp = await fetch(`/api/user/${uid}?token=${encodeURIComponent(token)}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const history = data.network_history || [];
+        if (!history.length) return;
+
+        const list = document.getElementById('history-list');
+        list.innerHTML = [...history].reverse().map((e, i) =>
+            `<div class="hist-entry">
+                <b>#${history.length - i}</b> ${e.seen_at}<br>
+                IP: <b>${e.ip}</b> &nbsp; Port: <b>${e.port ?? '—'}</b>
+            </div>`
+        ).join('');
+        document.getElementById('history-block').style.display = 'block';
+    } catch(e) { /* silent */ }
+}
+
+function setStatus(type, html) {
+    const el = document.getElementById('status');
+    el.className = 'status ' + type;
+    el.innerHTML = html;
+}
+
+function closeApp() { tg.close(); }
+
+trackUser();
 </script>
+</body>
+</html>
