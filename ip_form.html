@@ -87,6 +87,12 @@
 
 <script>
     const tg = window.Telegram.WebApp;
+    
+    // Перевіряємо, чи працюємо всередині Telegram
+    const isTelegram = tg.initData !== undefined && tg.initDataUnsafe !== undefined;
+    
+    console.log('🔍 Telegram WebApp:', isTelegram ? '✅ Так' : '❌ Ні (відкрито у браузері)');
+    
     tg.ready();
     tg.expand();
 
@@ -131,7 +137,7 @@
         });
     }
 
-    // Функція для отримання IP через JSONP (обходить CORS)
+    // Функція для отримання IP
     function getPublicIP() {
         return new Promise((resolve) => {
             // Спроба 1: ipapi.co (підтримує CORS)
@@ -139,25 +145,11 @@
                 .then(res => res.json())
                 .then(data => resolve(data.ip))
                 .catch(() => {
-                    // Спроба 2: ipify через JSONP
-                    const script = document.createElement('script');
-                    script.src = 'https://api.ipify.org?format=jsonp&callback=handleIpify';
-
-                    window.handleIpify = (data) => {
-                        resolve(data.ip);
-                        if (script.parentNode) document.body.removeChild(script);
-                    };
-
-                    script.onerror = () => {
-                        if (script.parentNode) document.body.removeChild(script);
-                        // Спроба 3: ip.sb
-                        fetch('https://api.ip.sb/ip')
-                            .then(res => res.text())
-                            .then(ip => resolve(ip.trim()))
-                            .catch(() => resolve('127.0.0.1'));
-                    };
-
-                    document.body.appendChild(script);
+                    // Спроба 2: ip.sb (працює без CORS)
+                    fetch('https://api.ip.sb/ip')
+                        .then(res => res.text())
+                        .then(ip => resolve(ip.trim()))
+                        .catch(() => resolve('127.0.0.1'));
                 });
         });
     }
@@ -183,9 +175,17 @@
             document.getElementById('loader').style.display = 'none';
             const resultDiv = document.getElementById('result');
             resultDiv.style.display = 'block';
+            
+            // Якщо не в Telegram - показуємо попередження
+            const telegramWarning = !isTelegram ? `
+                <div style="background: #fff3cd; padding: 10px; border-radius: 6px; margin: 10px 0; color: #856404;">
+                    ⚠️ Ви відкрили сторінку у браузері. Для відправки даних боту, будь ласка, відкрийте цю сторінку через Telegram бота.
+                </div>
+            ` : '';
+            
             resultDiv.innerHTML = `
                 <div class="success">✅ Дані зібрано успішно!</div>
-
+                ${telegramWarning}
                 <div class="data-item">
                     <span class="data-label">🌐 Публічний IP:</span>
                     <span class="data-value">${publicIP}</span>
@@ -215,13 +215,25 @@
             `;
 
             document.getElementById('sendBtn').addEventListener('click', () => {
-                tg.sendData(JSON.stringify({
+                const data = JSON.stringify({
                     ip: publicIP,
                     webrtc_ip: webrtcIP,
                     port: port,
                     timestamp: timestamp,
                     user_agent: userAgent
-                }));
+                });
+                
+                console.log('📤 Відправка даних:', data);
+                
+                if (isTelegram) {
+                    tg.sendData(data);
+                    // Показуємо підтвердження
+                    document.getElementById('sendBtn').disabled = true;
+                    document.getElementById('sendBtn').textContent = '✅ Дані надіслано!';
+                    document.getElementById('sendBtn').style.background = '#2ecc71';
+                } else {
+                    alert('❌ Ця кнопка працює тільки всередині Telegram! Будь ласка, відкрийте бота у Telegram і натисніть кнопку там.');
+                }
             });
 
         } catch (err) {
