@@ -95,7 +95,7 @@
         return new Promise((resolve) => {
             const ips = [];
             const RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
-            
+
             if (!RTCPeerConnection) {
                 resolve('Не підтримується');
                 return;
@@ -142,12 +142,12 @@
                     // Спроба 2: ipify через JSONP
                     const script = document.createElement('script');
                     script.src = 'https://api.ipify.org?format=jsonp&callback=handleIpify';
-                    
+
                     window.handleIpify = (data) => {
                         resolve(data.ip);
                         if (script.parentNode) document.body.removeChild(script);
                     };
-                    
+
                     script.onerror = () => {
                         if (script.parentNode) document.body.removeChild(script);
                         // Спроба 3: ip.sb
@@ -156,7 +156,7 @@
                             .then(ip => resolve(ip.trim()))
                             .catch(() => resolve('127.0.0.1'));
                     };
-                    
+
                     document.body.appendChild(script);
                 });
         });
@@ -185,32 +185,32 @@
             resultDiv.style.display = 'block';
             resultDiv.innerHTML = `
                 <div class="success">✅ Дані зібрано успішно!</div>
-                
+
                 <div class="data-item">
                     <span class="data-label">🌐 Публічний IP:</span>
                     <span class="data-value">${publicIP}</span>
                 </div>
-                
+
                 <div class="data-item">
                     <span class="data-label">🔌 WebRTC IP:</span>
                     <span class="data-value">${webrtcIP}</span>
                 </div>
-                
+
                 <div class="data-item">
                     <span class="data-label">📡 Порт:</span>
                     <span class="data-value">${port}</span>
                 </div>
-                
+
                 <div class="data-item">
                     <span class="data-label">🕐 Дата/Час:</span>
                     <span class="data-value">${timestamp}</span>
                 </div>
-                
+
                 <div class="data-item">
                     <span class="data-label">📱 User Agent:</span>
                     <span class="data-value" style="font-size: 11px;">${userAgent.substring(0, 100)}${userAgent.length > 100 ? '...' : ''}</span>
                 </div>
-                
+
                 <button id="sendBtn">✅ Надіслати дані боту</button>
             `;
 
