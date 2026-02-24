@@ -1,0 +1,87 @@
+<!-- ip_form.html -->
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Отримати IP-адресу</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background-color: #f6f7fa;
+        }
+        .container {
+            max-width: 400px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h2 { color: #4b7bec; }
+        p { color: #5e6c84; font-size: 14px; }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4b7bec;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .success {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>🔢 Ваша IP-адреса</h2>
+    <p>Натисніть кнопку, щоб отримати вашу публічну IP-адресу.</p>
+    <div id="loader" class="loader"></div>
+    <div id="result" style="display: none; margin-top: 20px;"></div>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+
+    // Розгорнути під Telegram
+    tg.expand();
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        try {
+            // Отримати IP через відомий API (без CORS-проблем)
+            const response = await fetch('https://api.ipify.org?format=json');
+            const data = await response.json();
+
+            // Показати результат
+            document.getElementById('loader').style.display = 'none';
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                <div class="success">✅ Ваш IP-адреса:</div>
+                <h3 style="color: #4b7bec;">${data.ip}</h3>
+                <button id="sendBtn" style="
+                    background: #4b7bec; color: white;
+                    border: none; padding: 10px 20px;
+                    border-radius: 8px; margin-top: 15px;
+                ">Надіслати IP боту</button>
+            `;
+
+            document.getElementById('sendBtn').addEventListener('click', () => {
+                // Надіслати IP боту
+                tg.sendData(JSON.stringify({ ip: data.ip }));
+            });
+
+        } catch (err) {
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('result').innerHTML = `<p style="color: red;">❌ Помилка отримання IP: ${err.message}</p>`;
+        }
+    });
+</script>
+</body>
+</html>
